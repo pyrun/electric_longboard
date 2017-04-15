@@ -12,7 +12,7 @@ int m_sollThrottle = 0;
 
 void setup() {
   
-  Serial.begin(9600);
+  Serial.begin(250000);
   Serial.setTimeout(500);
   
   // ESC anschließen und anfagns und end rate angeben
@@ -53,10 +53,10 @@ void loop() {
     m_esc.write(currentThrottle + step);
     currentThrottle = m_esc.read();
     Serial.println(currentThrottle);
-    if( step == 1)
+    //if( step == 1)
       delay(m_waitTrottleUp);
-    else
-      delay(m_waitTrottleDown);
+    /*else
+      delay(m_waitTrottleDown);*/
   }
 
 }
