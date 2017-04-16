@@ -19,6 +19,15 @@
 #define PYRUN_PIPE_HOST 0xC0F0E0F0E1LL
 #define PYRUN_PIPE_NODE 0xA0ECCCF0D2LL
 
+// 59 = gang 4
+// 57 = gang 3
+// 55 = gang 2
+// 50 = gang 1
+// 45 = leerlauf
+// 0 = bremse
+
+int leerlauf = 45;
+
 
 // ESC
 Servo m_esc;
@@ -59,10 +68,13 @@ void setup()
   printf_begin();
 }
 
+int watchdog = 0;
+
 void loop()
 {
+  watchdog++;
    // Warten auf input
-  /*if (Serial.available() > 0) {
+  if (Serial.available() > 0) {
     
     // Zahl lesen
     int serial = Serial.parseInt();
@@ -72,7 +84,7 @@ void loop()
     Serial.println(serial);
 
     m_sollThrottle = serial;
-  }*/
+  }
 
   // aktuelen werd lesen
   int currentThrottle = m_esc.read();
@@ -109,28 +121,43 @@ void loop()
     m_radio.read( &t_message, t_len);
   
     // split
-    int achse_x;
-    int achse_y;
-    int b_fire;
-    int b_break;
+    int l_a;
+    int l_b;
+    int l_x;
+    int l_y;
+    int l_fire;
+    int l_break;
   
-    achse_x = atoi(strtok( t_message, ";" ));
-    achse_y = atoi(strtok( NULL, ";" ));
-    b_fire = atoi(strtok( NULL, ";" ));
-    b_break = atoi(strtok( NULL, ";" ));
+    l_a = atoi(strtok( t_message, ";" ));
+    l_b = atoi(strtok( NULL, ";" ));
+    l_x = atoi(strtok( NULL, ";" ));
+    l_y = atoi(strtok( NULL, ";" ));
+    l_fire = atoi(strtok( NULL, ";" ));
+    l_break = atoi(strtok( NULL, ";" ));
 
-    if( achse_x > 220 && b_break)
+    Serial.print("Nachricht decode:");
+    Serial.print( l_a); Serial.print( " ");
+    Serial.print( l_b); Serial.print( " ");
+    Serial.print( l_x); Serial.print( " ");
+    Serial.print( l_y); Serial.print( " ");
+    Serial.print( l_fire); Serial.print( " ");
+    Serial.print( l_break); Serial.println( " ");
+
+    watchdog = 0;
+
+    if( l_y == 1 && l_x == 1)
       m_sollThrottle++;
-    else if( !b_break && m_sollThrottle > 0)
+    else if( !l_x && m_sollThrottle > leerlauf)
       m_sollThrottle--;
+    if( l_a)
+      m_sollThrottle = 0;
     Serial.println(m_sollThrottle);
-  
-    Serial.println( achse_x);
-    Serial.println( achse_y);
-    Serial.println( b_fire);
-    Serial.println( b_break);
+    
    
     m_radio.stopListening();
   }
+
+  if( watchdog > 1000)
+    m_sollThrottle = leerlauf;
 }
 
