@@ -81,7 +81,16 @@ void loop() {
   m_radio.stopListening();
   m_radio.write( &msg2, strlen(msg2));
   m_radio.startListening();
-
+  // falls was empfangen
+  if( m_radio.available() ) {
+    char t_message[255];
+    int t_len = m_radio.getDynamicPayloadSize();
+    
+    // auslesen
+    m_radio.read( &t_message, t_len);
+    Serial.print("Nachricht decode:");
+    Serial.println( t_message);
+  }
   Serial.print(msg2);
   Serial.print( " Length: ");
   Serial.println( strlen(msg2));

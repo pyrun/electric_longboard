@@ -28,6 +28,8 @@
 
 int leerlauf = 45;
 
+int voltage_pin = A1;
+
 
 // ESC
 Servo m_esc;
@@ -59,16 +61,24 @@ void setup()
   m_radio.openWritingPipe( PYRUN_PIPE_NODE);
   m_radio.openReadingPipe(1, PYRUN_PIPE_HOST );
 
+  m_radio.startListening();
+
   // ESC anschließen und anfagns und end rate angeben
   m_esc.attach( m_escPin, m_minP, m_maxP); 
 
   // 0 schreiben damit der ESC in grundeinstellung ist
   m_esc.write(0);
+
+  delay( 1000); // 1 sekunde warten
   
   printf_begin();
 }
 
 int watchdog = 0;
+char msg2[16];
+int step = 1;
+int currentThrottle = 0;
+int sensorValue = 0;
 
 void loop()
 {
@@ -85,14 +95,20 @@ void loop()
 
     m_sollThrottle = serial;
   }
+  
+  sensorValue = analogRead( voltage_pin);    // read the input pin
+  /*float voltage = sensorValue * (5.0 / 1023.0);
+  Serial.println(voltage);             // debug value*/
 
+   
   // aktuelen werd lesen
-  int currentThrottle = m_esc.read();
+  currentThrottle = m_esc.read();
   
   // enscheiden ob hoch oder runter geht
-  int step = 1;
   if( m_sollThrottle < currentThrottle )
     step = -1;
+  else
+    step = 1;
   
   // langsam dem wert anpassen
   if( currentThrottle != m_sollThrottle ) {
@@ -110,8 +126,7 @@ void loop()
   m_radio.write( &msg2, strlen(msg2));
   m_radio.startListening();
   delay(10);*/
-
-  m_radio.startListening();
+   
   // falls was empfangen
   if( m_radio.available() ) {
     char t_message[255];
@@ -152,10 +167,11 @@ void loop()
     if( l_a)
       m_sollThrottle = 0;
     Serial.println(m_sollThrottle);
-    
-   
+    sprintf( msg2,"%d;", sensorValue);
     m_radio.stopListening();
+    //m_radio.write( &msg2, strlen(msg2));
   }
+  m_radio.startListening();
 
   if( watchdog > 1000)
     m_sollThrottle = leerlauf;
