@@ -1,13 +1,10 @@
 
 /*
- * ArduinoNunchukDemo.ino
+ * Empfänger
  *
- * Copyright 2011-2013 Gabriel Bianconi, http://www.gabrielbianconi.com/
- *
- * Project URL: http://www.gabrielbianconi.com/projects/arduinonunchuk/
+ * Project URL: https://github.com/pyrun/electric_longboard
  *
  */
-
 #include <Wire.h>
 #include <SPI.h>
 #include <RF24.h>
@@ -29,7 +26,6 @@
 int leerlauf = 45;
 
 int voltage_pin = A1;
-
 
 // ESC
 Servo m_esc;
@@ -61,46 +57,47 @@ void setup()
   m_radio.openWritingPipe( PYRUN_PIPE_NODE);
   m_radio.openReadingPipe(1, PYRUN_PIPE_HOST );
 
-  m_radio.startListening();
-
   // ESC anschließen und anfagns und end rate angeben
   m_esc.attach( m_escPin, m_minP, m_maxP); 
 
   // 0 schreiben damit der ESC in grundeinstellung ist
   m_esc.write(0);
-
+  
   delay( 1000); // 1 sekunde warten
+
+  m_esc.write(1);
   
   printf_begin();
+
+  m_radio.startListening();
 }
 
 int watchdog = 0;
-char msg2[16];
 int step = 1;
 int currentThrottle = 0;
 int sensorValue = 0;
 
+#define WATCHDOG_CIRCLES 1000
+
 void loop()
 {
+  // watchdog number incress
   watchdog++;
+  
    // Warten auf input
   if (Serial.available() > 0) {
-    
     // Zahl lesen
     int serial = Serial.parseInt();
     
-    // ausgeben
-    Serial.print("Throttle gesetzt auf: ");
-    Serial.println(serial);
-
+    // setzte neue Throttle
     m_sollThrottle = serial;
   }
-  
-  sensorValue = analogRead( voltage_pin);    // read the input pin
+
+  // read the input pin
+  sensorValue = analogRead( voltage_pin);    
   /*float voltage = sensorValue * (5.0 / 1023.0);
   Serial.println(voltage);             // debug value*/
-
-   
+  
   // aktuelen werd lesen
   currentThrottle = m_esc.read();
   
@@ -114,27 +111,22 @@ void loop()
   if( currentThrottle != m_sollThrottle ) {
     m_esc.write(currentThrottle + step);
     currentThrottle = m_esc.read();
-    //Serial.println(currentThrottle);
+    // stepp up oder down
     if( step == 1)
       delay(m_waitTrottleUp);
     else
       delay(m_waitTrottleDown);
   }
-  /*char msg2[64];
-  sprintf( msg2,"%d;%d;%d;%d;", nunchuk.analogY, nunchuk.analogX, nunchuk.zButton, nunchuk.cButton);
-  m_radio.stopListening();
-  m_radio.write( &msg2, strlen(msg2));
-  m_radio.startListening();
-  delay(10);*/
-   
+  
   // falls was empfangen
   if( m_radio.available() ) {
     char t_message[255];
     int t_len = m_radio.getDynamicPayloadSize();
     
     // auslesen
+    Serial.print( "Empfange...");
     m_radio.read( &t_message, t_len);
-  
+
     // split
     int l_a;
     int l_b;
@@ -142,7 +134,6 @@ void loop()
     int l_y;
     int l_fire;
     int l_break;
-  
     l_a = atoi(strtok( t_message, ";" ));
     l_b = atoi(strtok( NULL, ";" ));
     l_x = atoi(strtok( NULL, ";" ));
@@ -150,7 +141,7 @@ void loop()
     l_fire = atoi(strtok( NULL, ";" ));
     l_break = atoi(strtok( NULL, ";" ));
 
-    Serial.print("Nachricht decode:");
+    Serial.print("Nachricht erhalten...Decode:");
     Serial.print( l_a); Serial.print( " ");
     Serial.print( l_b); Serial.print( " ");
     Serial.print( l_x); Serial.print( " ");
@@ -158,22 +149,32 @@ void loop()
     Serial.print( l_fire); Serial.print( " ");
     Serial.print( l_break); Serial.println( " ");
 
+    // reset des watchdog
     watchdog = 0;
 
+    // logic knöpfe -> uiuiui
     if( l_y == 1 && l_x == 1)
       m_sollThrottle++;
     else if( !l_x && m_sollThrottle > leerlauf)
       m_sollThrottle--;
     if( l_a)
-      m_sollThrottle = 0;
-    Serial.println(m_sollThrottle);
-    sprintf( msg2,"%d;", sensorValue);
+      m_sollThrottle = m_sollThrottle/2;
+
+    // senden des Status -> nachricht verfassen
+    char msg2[16];
+    sprintf( msg2,"%d;%d;%d;", sensorValue, currentThrottle, m_sollThrottle);
     m_radio.stopListening();
-    //m_radio.write( &msg2, strlen(msg2));
+
+    // senden der nachricht
+    delay( 2); // nicht sofort sonst hängt sich das senden auf
+    Serial.println( msg2);
+    m_radio.write( &msg2, strlen(msg2));
   }
+  // lauschen
   m_radio.startListening();
 
-  if( watchdog > 1000)
+  // watchdog prüfen
+  if( watchdog > WATCHDOG_CIRCLES)
     m_sollThrottle = leerlauf;
 }
 
