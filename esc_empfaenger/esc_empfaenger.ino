@@ -1,4 +1,3 @@
-
 /*
  * Empfänger
  *
@@ -66,7 +65,9 @@ void setup()
   delay( 1000); // 1 sekunde warten
 
   m_esc.write(1);
-  
+
+  delay( 2000); // 1 sekunde warten
+   
   printf_begin();
 
   m_radio.startListening();
@@ -174,7 +175,11 @@ void loop()
   m_radio.startListening();
 
   // watchdog prüfen
-  if( watchdog > WATCHDOG_CIRCLES)
-    m_sollThrottle = leerlauf;
+  if( watchdog > WATCHDOG_CIRCLES) {
+    if( m_sollThrott >= leerlauf)
+      m_sollThrottle = leerlauf;
+    else
+      m_sollThrottle = 0;
+  }
 }
 
