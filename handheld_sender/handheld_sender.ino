@@ -19,29 +19,36 @@ RF24 m_radio( 9,10);
 // Instantiate a Bounce object
 Bounce debouncer_break = Bounce(); 
 
-
 void setup() {
   // initialize with the I2C addr 0x3C / mit I2C-Adresse 0x3c initialisieren
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
- 
+  
+  // Show image buffer on the display hardware
+  display.display();
+
+  // radio set
   m_radio.begin();
   m_radio.enableDynamicPayloads();
   m_radio.setAutoAck( true ) ;
+  
   // Optionally, increase the delay between retries & # of retries
-  //m_radio->setRetries(2,15);
+  m_radio.setRetries(2,15);
+  
   // set speed
   m_radio.setDataRate( RF24_250KBPS );
   m_radio.powerUp();
 
+  // write pipe
   m_radio.openWritingPipe( PYRUN_PIPE_HOST);
   m_radio.openReadingPipe(1, PYRUN_PIPE_NODE);
 
+  // set up
   digitalWrite(A0, INPUT_PULLUP);
   digitalWrite(A1, INPUT_PULLUP);
   digitalWrite(A2, INPUT_PULLUP);
   digitalWrite(A3, INPUT_PULLUP);
 
-  // Setup the button with an internal pull-up :
+  // Setup the button with an internal pull-up
   pinMode(BUTTON_Break,INPUT_PULLUP);
  
   // After setting up the button, setup the Bounce instance
@@ -50,7 +57,8 @@ void setup() {
   
   // initialize serial communications at 9600 bps:
   Serial.begin(250000);
-  
+
+  // printf begin
   printf_begin();
 }
 
@@ -64,17 +72,26 @@ int leseKnopf( int port) {
 
 char *ftoa(char *a, double f, int precision)
 {
- long p[] = {0,10,100,1000,10000,100000,1000000,10000000,100000000};
- 
- char *ret = a;
- long heiltal = (long)f;
- itoa(heiltal, a, 10);
- while (*a != '\0') a++;
- *a++ = '.';
- long desimal = abs((long)((f - heiltal) * p[precision]));
- itoa(desimal, a, 10);
- return ret;
+  long p[] = {0,10,100,1000,10000,100000,1000000,10000000,100000000};
+  
+  char *ret = a;
+  long heiltal = (long)f;
+  itoa(heiltal, a, 10);
+  while (*a != '\0') a++;
+  *a++ = '.';
+  long desimal = abs((long)((f - heiltal) * p[precision]));
+  itoa(desimal, a, 10);
+  return ret;
 }
+
+char p_voltage[16];
+char p_throttle[24];
+
+
+int p_soll_throttle = 0;
+int p_current = 0;
+int p_temp = 20;
+int p_temperature = 28;
 
 void loop() {
   int l_a, l_b, l_x, l_y;
@@ -97,54 +114,74 @@ void loop() {
   m_radio.startListening();
   // falls was empfangen
   if( m_radio.available() ) {
-    char t_message[255];
+    char t_message[64];
     int t_len = m_radio.getDynamicPayloadSize();
     
     // auslesen
     m_radio.read( &t_message, t_len);
     // auslesen
     Serial.print( "Empfange...");
+    
     // split
     int t_voltage = atoi(strtok( t_message, ";" ));
     float voltage = t_voltage * (5.0 / 1023.0)*7.78;
-    int current = atoi(strtok( NULL, ";" ));
-    int soll_throttle = atoi(strtok( NULL, ";" ));
+    p_current = atoi(strtok( NULL, ";" ));
+    p_soll_throttle = atoi(strtok( NULL, ";" ));
 
-
-    // display
-    display.clearDisplay();
-    // set text color / Textfarbe setzen
-    display.setTextColor(WHITE);
-    display.setTextSize(1);
-    // set text cursor position / Textstartposition einstellen
-    display.setCursor(1,0);
-    // show text / Text anzeigen
-    display.println("Pyrun - Longboard");
-
-
-    
-    
-    // show text / Text anzeigen
-    display.setCursor(0,8);
-    char msg_voltage[24];
     char string_voltage[24];
     ftoa( string_voltage, voltage, 1);
-    sprintf( msg_voltage,"Voltage: %sV", string_voltage);
-    display.println(msg_voltage);
-
-    display.setCursor(0,16);
-    char msg_throttle[24];
-    sprintf( msg_throttle,"Throttle: i%d/s%d", current, soll_throttle);
-    display.println(msg_throttle);
-    
-    /*display.setCursor(1,24);
-    char msg_length[24];
-    sprintf( msg_length,"???Km");
-    display.println(msg_length);*/
-    display.display();
+    sprintf( p_voltage,"%sV", string_voltage);
     
     Serial.println( t_message);
   }
+
+  
+  // display
+  display.clearDisplay();
+  // set text color / Textfarbe setzen
+  display.setTextColor(WHITE);
+  display.setTextSize(1);
+  // set text cursor position / Textstartposition einstellen
+
+  // temperature
+  display.setTextSize(1);
+  display.setCursor(60,0);
+  display.println("Temperature");
+  display.setTextSize(2);
+  display.setCursor(80,10);
+  display.println(p_temperature);
+  display.setTextSize(2);
+  display.setCursor(112,10);
+  display.println("C");
+  display.drawCircle(108, 12, 3, WHITE);
+  
+  // voltage
+  display.setTextSize(1);
+  display.setCursor(1,0);
+  display.println("Voltage");
+  display.setTextSize(2);
+  display.setCursor(0,10);
+  display.println(p_voltage);
+
+  // throttle
+  display.setTextSize(1);
+  display.setCursor( 0,38);
+  display.println( "Throttle i/s");
+  display.setTextSize(2);
+  display.setCursor( 0,48);
+  sprintf( p_throttle,"%d/%d", p_current, p_soll_throttle);
+  display.println( p_throttle);
+
+  // credits
+  display.setTextSize(1);
+  display.setCursor( 90,44);
+  display.println( "Pyrun");
+  display.setCursor( 90,54);
+  display.println( "@2017");
+  
+  // flip
+  display.display();
+    
   Serial.print(msg2);
   Serial.print( " Length: ");
   Serial.println( strlen(msg2));
