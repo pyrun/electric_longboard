@@ -9,6 +9,7 @@
 #include <RF24.h>
 #include <printf.h>
 #include <Servo.h> 
+#include "AnalogSmooth.h"
 
 #define BAUDRATE 250000
 
@@ -25,6 +26,9 @@
 int leerlauf = 45;
 
 int voltage_pin = A1;
+
+int sensorPin = 0;
+AnalogSmooth temp_sensor = AnalogSmooth(20);
 
 // ESC
 Servo m_esc;
@@ -85,6 +89,16 @@ void loop()
   // watchdog number incress
   watchdog++;
   
+  //getting the voltage reading from the temperature sensor
+   float reading = temp_sensor.analogReadSmooth(sensorPin); // analogRead(sensorPin);  
+   
+   // converting that reading to voltage, for 3.3v arduino use 3.3
+   float voltage = reading * 5.0;
+   voltage /= 1024.0;
+   
+   // now print out the temperature
+   float temperatureC = (voltage - 0.5) * 100 ;  //converting from 10 mv per degree wit 500 mV offset
+                                                 //to degrees ((voltage - 500mV) times 100)
    // Warten auf input
   if (Serial.available() > 0) {
     // Zahl lesen
@@ -163,7 +177,9 @@ void loop()
 
     // senden des Status -> nachricht verfassen
     char msg2[16];
-    sprintf( msg2,"%d;%d;%d;", sensorValue, currentThrottle, m_sollThrottle);
+    char str_temp[6];
+    dtostrf( temperatureC, 2, 1, str_temp);
+    sprintf( msg2,"%d;%d;%d;%s;", sensorValue, currentThrottle, m_sollThrottle, str_temp);
     m_radio.stopListening();
 
     // senden der nachricht
@@ -176,7 +192,7 @@ void loop()
 
   // watchdog prüfen
   if( watchdog > WATCHDOG_CIRCLES) {
-    if( m_sollThrott >= leerlauf)
+    if( m_sollThrottle >= leerlauf)
       m_sollThrottle = leerlauf;
     else
       m_sollThrottle = 0;

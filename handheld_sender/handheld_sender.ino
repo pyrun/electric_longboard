@@ -127,6 +127,7 @@ void loop() {
     float voltage = t_voltage * (5.0 / 1023.0)*7.78;
     p_current = atoi(strtok( NULL, ";" ));
     p_soll_throttle = atoi(strtok( NULL, ";" ));
+    p_temperature = atoi(strtok( NULL, ";" ));
 
     char string_voltage[24];
     ftoa( string_voltage, voltage, 1);
